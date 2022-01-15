@@ -27,6 +27,8 @@ const main = async () => {
 		url: process.env.REDIS_CONNECT_URL,
 	});
 	app.set('trust proxy', !__prod__);
+	const SESSION_SECRET = process.env.SESSION_SECRET;
+	if (!SESSION_SECRET) throw new Error("SESSION_SECRET environment variable is not set");
 	app.use(
 		session({
 			name: 'qid',
@@ -38,7 +40,7 @@ const main = async () => {
 				secure: true,
 			},
 			saveUninitialized: false,
-			secret: 'SSRLeozfoE42F@ZoF/Ic9o?pv;oDXno',
+			secret: SESSION_SECRET,
 			resave: false,
 		})
 	);
