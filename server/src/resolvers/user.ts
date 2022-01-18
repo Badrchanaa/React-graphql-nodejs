@@ -1,40 +1,25 @@
 import User from '../entities/User';
-import { SESSION_COOKIE_NAME } from '../utils/constants';
+import {
+	REDIS_RESET_PASSWORD_PREFIX,
+	SESSION_COOKIE_NAME,
+} from '../utils/constants';
 import {
 	Arg,
 	Ctx,
 	Field,
-	InputType,
 	Mutation,
 	ObjectType,
 	Query,
 	Resolver,
 } from 'type-graphql';
 import { ApolloServerContext } from 'src/types';
-import { EntityManager } from '@mikro-orm/postgresql';
 import argon2 from 'argon2';
-
-@InputType()
-class RegisterInput {
-	@Field()
-	username: string;
-
-	@Field()
-	password: string;
-
-	@Field()
-	email: string;
-}
-
-@InputType()
-class LoginInput {
-	@Field()
-	username: string;
-
-	@Field()
-	password: string;
-}
-
+import { validateRegister } from './validateRegister';
+import { LoginInput, RegisterInput } from './InputTypes';
+import { sendEmail } from '../utils/sendEmail';
+import { v4 as uuidv4 } from 'uuid';
+import { invalidPasswordError, tokenExpiredError } from '../utils/errors';
+import { getConnection } from 'typeorm';
 @ObjectType()
 class FieldError {
 	@Field()
@@ -56,66 +41,96 @@ class UserResponse {
 @Resolver()
 class UserResolver {
 	@Query(() => User, { nullable: true })
-	async me(@Ctx() { req, em }: ApolloServerContext): Promise<User | null> {
+	me(@Ctx() { req }: ApolloServerContext) {
 		const userId = req.session.userId;
 
 		if (!userId) return null;
 
-		const user = await em.findOne(User, { id: userId });
+		return User.findOne(userId);
+	}
+	@Mutation(() => UserResponse)
+	async changePassword(
+		@Arg('token') token: string,
+		@Arg('newPassword') newPassword: string,
+		@Ctx() { req, redis }: ApolloServerContext
+	): Promise<UserResponse> {
+		if (!newPassword || newPassword.length <= 7)
+			return {
+				errors: [invalidPasswordError],
+			};
+		const key = REDIS_RESET_PASSWORD_PREFIX + token;
+		const userIdStr = await redis.get(key);
+		if (!userIdStr)
+			return {
+				errors: [tokenExpiredError],
+			};
+		const userId = parseInt(userIdStr);
+		const user = await User.findOne(userId);
+		if (!user)
+			return {
+				errors: [tokenExpiredError],
+			};
 
-		return user;
+		await User.update(
+			{ id: userId },
+			{ password: await argon2.hash(newPassword) }
+		);
+
+		await redis.del(key);
+
+		req.session.userId = user.id;
+
+		return {
+			user,
+		};
 	}
 
-  @Mutation(() => Boolean)
-  async forgotPassword(
-    @Arg('email') email: string,
-    @Ctx() { em } : ApolloServerContext
-  ){
-    const user = em.findOne(User, {email});
-    if (!user) return false;
-    return true;
-  }
+	@Mutation(() => Boolean)
+	async resetPassword(
+		@Arg('email') email: string,
+		@Ctx() { redis }: ApolloServerContext
+	) {
+		const user = await User.findOne({ where: { email } });
+		if (!user) {
+			return true;
+		}
+		const token = uuidv4();
+		await redis.set(
+			REDIS_RESET_PASSWORD_PREFIX + token,
+			user.id,
+			'ex',
+			14400000 // 4 hours
+		);
+		sendEmail(
+			email,
+			'Reset password',
+			`Hello ${user.username},<br />click <a href="http://localhost:3000/reset-password/${token}">reset password</a> to reset your password.`
+		);
+		return true;
+	}
 
 	@Mutation(() => UserResponse)
 	async register(
 		@Arg('options') { username, password, email }: RegisterInput,
-		@Ctx() { em, req }: ApolloServerContext
+		@Ctx() { req }: ApolloServerContext
 	): Promise<UserResponse> {
-		if (!username || username.length <= 2)
-			return {
-				errors: [
-					{
-						field: 'username',
-						message: 'length must be greater than 2.',
-					},
-				],
-			};
-		if (!password || password.length <= 7)
-			return {
-				errors: [
-					{
-						field: 'password',
-						message: 'length must be greater than 7.',
-					},
-				],
-			};
+		// TODO: Add advanced validation
+		const errors = validateRegister({ username, password, email });
+		if (errors) return { errors };
 		const hashedPassword = await argon2.hash(password);
 		let user;
 		try {
-			const result = await (em as EntityManager)
-				.createQueryBuilder(User)
-				.getKnexQuery()
-				.insert({
-					username,
-					password: hashedPassword,
-					email,
-					created_at: new Date(),
-					updated_at: new Date(),
-				})
-				.returning('*');
-
-			user = result[0];
+			const result = await getConnection()
+				.createQueryBuilder()
+				.insert()
+				.into(User)
+				.values({ username, password: hashedPassword, email })
+        .returning('*')
+				.execute();
+			console.log('Result: ', result);
+			user = result.raw[0];
 		} catch (err) {
+			console.log('Err: ', err);
 			// Error duplicate field
 			if (err.code === '23505')
 				return {
@@ -137,9 +152,9 @@ class UserResolver {
 	@Mutation(() => UserResponse)
 	async login(
 		@Arg('options') options: LoginInput,
-		@Ctx() { em, req }: ApolloServerContext
+		@Ctx() { req }: ApolloServerContext
 	): Promise<UserResponse> {
-		const user = await em.findOne(User, { username: options.username });
+		const user = await User.findOne({ where: { username: options.username } });
 		if (!user)
 			return {
 				errors: [
@@ -169,41 +184,13 @@ class UserResolver {
 		};
 	}
 
-	@Mutation(() => User, { nullable: true })
-	async updateUser(
-		@Arg('id') id: number,
-		@Arg('username') username: string,
-		@Ctx() { em }: ApolloServerContext
-	): Promise<User | null> {
-		const user = await em.findOne(User, { id });
-		if (!user) return null;
-
-		user.username = username;
-		await em.persistAndFlush(user);
-
-		return user;
-	}
-
-	@Mutation(() => Boolean)
-	async deleteUser(
-		@Arg('id') id: number,
-		@Ctx() { em }: ApolloServerContext
-	): Promise<boolean> {
-		try {
-			await em.nativeDelete(User, { id });
-		} catch {
-			return false;
-		}
-		return true;
-	}
-
 	@Mutation(() => Boolean)
 	logout(@Ctx() { req, res }: ApolloServerContext) {
 		return new Promise((resolve) =>
 			req.session.destroy((err) => {
-        res.clearCookie(SESSION_COOKIE_NAME);
+				res.clearCookie(SESSION_COOKIE_NAME);
 				if (err) {
-          console.log(err);
+					console.log(err);
 					resolve(false);
 					return;
 				}

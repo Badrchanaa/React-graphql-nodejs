@@ -1,22 +1,27 @@
 import 'reflect-metadata';
-import { MikroORM } from '@mikro-orm/core';
-import mikroConfig from './mikro-orm.config';
+require('dotenv').config();
 import express from 'express';
 import { ApolloServer } from 'apollo-server-express';
 import { buildSchema } from 'type-graphql';
 import { HelloResolver, PostResolver, UserResolver } from './resolvers';
 import { SESSION_COOKIE_NAME, __prod__ } from './utils/constants';
-import redis from 'redis';
+import Redis from 'ioredis';
 import session from 'express-session';
 import connectRedis from 'connect-redis';
 import cors from 'cors';
-import { sendEmail } from './utils/sendEmail';
+import { createConnection } from 'typeorm';
+import User from './entities/User';
+import Post from './entities/Post';
 
 const main = async () => {
-  sendEmail('badrchanaa@gmail.com', 'testing nodemailer', 'testing body');
-	const orm = await MikroORM.init(mikroConfig);
-	await orm.getMigrator().up();
-
+  const { dbname, dbuser, dbpassword } = process.env;
+  await createConnection({
+    type: 'postgres',
+    url: `postgres://${dbuser}:${dbpassword}@surus.db.elephantsql.com/${dbname}`,
+    logging: true,
+    synchronize: true,
+    entities: [Post, User],
+  });
 	const app = express();
 	app.use(
 		cors({
@@ -25,9 +30,8 @@ const main = async () => {
 		})
 	);
 	const RedisStore = connectRedis(session);
-	const redisClient = redis.createClient({
-		url: process.env.REDIS_CONNECT_URL,
-	});
+  const redisClient = new Redis(process.env.REDIS_CONNECT_URL);
+
 	app.set('trust proxy', !__prod__);
 	const SESSION_SECRET = process.env.SESSION_SECRET;
 	if (!SESSION_SECRET) throw new Error("SESSION_SECRET environment variable is not set");
@@ -52,7 +56,7 @@ const main = async () => {
 			resolvers: [HelloResolver, PostResolver, UserResolver],
 			validate: false,
 		}),
-		context: ({ res, req }) => ({ em: orm.em, res, req }),
+		context: ({ res, req }) => ({ res, req, redis: redisClient }),
 	});
 
 	await apolloServer.start();

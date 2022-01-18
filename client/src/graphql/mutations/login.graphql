@@ -1,10 +1,5 @@
 mutation Login($options: LoginInput!){
   login(options: $options){
-      errors {
-          ...RegularErrors
-      },
-      user{
-        ...RegularUser
-      }
+      ...RegularUserResponse
   }
 }
