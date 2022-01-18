@@ -1,4 +1,5 @@
 import User from '../entities/User';
+import { SESSION_COOKIE_NAME } from '../utils/constants';
 import {
 	Arg,
 	Ctx,
@@ -10,7 +11,7 @@ import {
 	Resolver,
 } from 'type-graphql';
 import { ApolloServerContext } from 'src/types';
-import {EntityManager} from '@mikro-orm/postgresql';
+import { EntityManager } from '@mikro-orm/postgresql';
 import argon2 from 'argon2';
 
 @InputType()
@@ -65,6 +66,16 @@ class UserResolver {
 		return user;
 	}
 
+  @Mutation(() => Boolean)
+  async forgotPassword(
+    @Arg('email') email: string,
+    @Ctx() { em } : ApolloServerContext
+  ){
+    const user = em.findOne(User, {email});
+    if (!user) return false;
+    return true;
+  }
+
 	@Mutation(() => UserResponse)
 	async register(
 		@Arg('options') { username, password, email }: RegisterInput,
@@ -91,14 +102,17 @@ class UserResolver {
 		const hashedPassword = await argon2.hash(password);
 		let user;
 		try {
-			const result = await (em as EntityManager).createQueryBuilder(User).getKnexQuery().insert(
-				{username,
-				password: hashedPassword,
-				email,
-				created_at: new Date(),
-				updated_at: new Date(),
-				}
-			).returning('*');
+			const result = await (em as EntityManager)
+				.createQueryBuilder(User)
+				.getKnexQuery()
+				.insert({
+					username,
+					password: hashedPassword,
+					email,
+					created_at: new Date(),
+					updated_at: new Date(),
+				})
+				.returning('*');
 
 			user = result[0];
 		} catch (err) {
@@ -113,7 +127,6 @@ class UserResolver {
 					],
 				};
 		}
-		console.log('user obj: ', user);
 		req.session.userId = user.id;
 
 		return {
@@ -182,6 +195,21 @@ class UserResolver {
 			return false;
 		}
 		return true;
+	}
+
+	@Mutation(() => Boolean)
+	logout(@Ctx() { req, res }: ApolloServerContext) {
+		return new Promise((resolve) =>
+			req.session.destroy((err) => {
+        res.clearCookie(SESSION_COOKIE_NAME);
+				if (err) {
+          console.log(err);
+					resolve(false);
+					return;
+				}
+				resolve(true);
+			})
+		);
 	}
 }
 export default UserResolver;

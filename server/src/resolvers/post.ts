@@ -14,7 +14,7 @@ class PostResolver {
 		@Arg('postId') id: number,
 		@Ctx() { em }: ApolloServerContext
 	): Promise<Post | null> {
-		return em.findOne(Post, { id });
+		return em.findOne(Post, id );
 	}
 
 	@Mutation(() => Post)
@@ -34,25 +34,23 @@ class PostResolver {
 		@Ctx() { em }: ApolloServerContext
 	): Promise<Post | null> {
 		const post = await em.findOne(Post, { id });
-        if(!post) return null;
-
-        post.title = title;
-		await em.persistAndFlush(post);
-
+		if (!post) return null;
+		post.title = title;
+		await em.flush();
 		return post;
 	}
 
-    @Mutation(() => Boolean)
+	@Mutation(() => Boolean)
 	async deletePost(
 		@Arg('id') id: number,
 		@Ctx() { em }: ApolloServerContext
 	): Promise<boolean> {
-        try{
-            await em.nativeDelete(Post, { id });
-        }catch{
-            return false;
-        }
-        return true;
+		try {
+			await em.nativeDelete(Post, { id });
+		} catch {
+			return false;
+		}
+		return true;
 	}
 }
 

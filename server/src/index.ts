@@ -5,13 +5,15 @@ import express from 'express';
 import { ApolloServer } from 'apollo-server-express';
 import { buildSchema } from 'type-graphql';
 import { HelloResolver, PostResolver, UserResolver } from './resolvers';
-import { __prod__ } from './utils/constants';
+import { SESSION_COOKIE_NAME, __prod__ } from './utils/constants';
 import redis from 'redis';
 import session from 'express-session';
 import connectRedis from 'connect-redis';
 import cors from 'cors';
+import { sendEmail } from './utils/sendEmail';
 
 const main = async () => {
+  sendEmail('badrchanaa@gmail.com', 'testing nodemailer', 'testing body');
 	const orm = await MikroORM.init(mikroConfig);
 	await orm.getMigrator().up();
 
@@ -31,7 +33,7 @@ const main = async () => {
 	if (!SESSION_SECRET) throw new Error("SESSION_SECRET environment variable is not set");
 	app.use(
 		session({
-			name: 'qid',
+			name: SESSION_COOKIE_NAME,
 			store: new RedisStore({ client: redisClient, disableTouch: true }),
 			cookie: {
 				maxAge: 1000 * 3600 * 24 * 365 * 12, // 12 years

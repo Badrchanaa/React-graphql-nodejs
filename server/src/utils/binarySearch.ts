@@ -1,4 +1,4 @@
-function binarySearch(haystack: number[], needle: number): number {
+export function binarySearch(haystack: number[], needle: number): number {
 
     let subEnd = haystack.length;
     let subStart: number = Math.floor(subEnd / 2);
