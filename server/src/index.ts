@@ -12,16 +12,23 @@ import cors from 'cors';
 import { createConnection } from 'typeorm';
 import User from './entities/User';
 import Post from './entities/Post';
+import path from 'path';
 
 const main = async () => {
+  
   const { dbname, dbuser, dbpassword } = process.env;
-  await createConnection({
+
+  const db = await createConnection({
     type: 'postgres',
     url: `postgres://${dbuser}:${dbpassword}@surus.db.elephantsql.com/${dbname}`,
-    logging: true,
-    synchronize: true,
+    logging: !__prod__,
+    synchronize: !__prod__,
+    migrations: [path.join(__dirname, './migrations/*')],
     entities: [Post, User],
   });
+
+  db.runMigrations();
+
 	const app = express();
 	app.use(
 		cors({
@@ -62,10 +69,8 @@ const main = async () => {
 	await apolloServer.start();
 
 	apolloServer.applyMiddleware({ app, cors: false });
-
-	const PORT = process.env.PORT;
-
-	app.listen(PORT || 4001, () => {
+  const PORT = process.env.PORT || 4000;
+	app.listen(PORT, () => {
 		console.log('Server started listening on port', PORT);
 	});
 };

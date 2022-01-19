@@ -24,7 +24,9 @@ const Login: React.FC<loginProps> = ({}) => {
 					if (response.data?.login.errors) {
 						setErrors(toErrorMap(response.data.login.errors));
 					} else if (response.data?.login.user) {
-						router.push('/');
+						if (typeof router.query.next === 'string')
+							router.push(router.query.next);
+						else router.push('/');
 					}
 					return true;
 				}}>
@@ -41,13 +43,16 @@ const Login: React.FC<loginProps> = ({}) => {
 								name="password"
 								label="Password"
 								type="password"
+                autoComplete='off'
 							/>
 						</Box>
 						<Flex mt={1}>
-            <NextLink href="/forgot-password">
-							<Link ml='auto' mr={1}>Forgot password ?</Link>
-						</NextLink>
-            </Flex>
+							<NextLink href="/forgot-password">
+								<Link ml="auto" mr={1}>
+									Forgot password ?
+								</Link>
+							</NextLink>
+						</Flex>
 						<Button
 							mt={4}
 							colorScheme="teal"

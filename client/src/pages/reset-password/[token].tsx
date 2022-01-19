@@ -11,7 +11,7 @@ import { createUrqlClient } from '../../utils/createUrqlClient';
 import { toErrorMap } from '../../utils/toErrorMap';
 import { validPassword } from '../../utils/validPassword';
 
-const ResetPassword: NextPage<{ token: string }> = ({ token }) => {
+const ResetPassword: NextPage = () => {
 	const router = useRouter();
 	const [tokenError, setTokenError] = useState('');
 	const [, changePassword] = useChangePasswordMutation();
@@ -35,7 +35,7 @@ const ResetPassword: NextPage<{ token: string }> = ({ token }) => {
 				initialValues={{ password: '', confirmPassword: '' }}
 				onSubmit={async (values, { setErrors }) => {
 					const response = await changePassword({
-						token,
+						token: typeof router.query.token === 'string' ? router.query.token : '',
 						newPassword: values.password,
 					});
 
@@ -88,10 +88,5 @@ const ResetPassword: NextPage<{ token: string }> = ({ token }) => {
 	);
 };
 
-ResetPassword.getInitialProps = ({ query }) => {
-	return {
-		token: query.token as string,
-	};
-};
 
 export default withUrqlClient(createUrqlClient)(ResetPassword);

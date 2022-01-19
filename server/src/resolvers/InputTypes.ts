@@ -13,6 +13,15 @@ export class RegisterInput {
 }
 
 @InputType()
+export class PostInput {
+	@Field()
+	title: string;
+
+	@Field()
+	text: string;
+}
+
+@InputType()
 export class LoginInput {
 	@Field()
 	username: string;

@@ -127,10 +127,10 @@ class UserResolver {
 				.values({ username, password: hashedPassword, email })
         .returning('*')
 				.execute();
-			console.log('Result: ', result);
+			//console.log('Result: ', result);
 			user = result.raw[0];
 		} catch (err) {
-			console.log('Err: ', err);
+			//console.log('Err: ', err);
 			// Error duplicate field
 			if (err.code === '23505')
 				return {
