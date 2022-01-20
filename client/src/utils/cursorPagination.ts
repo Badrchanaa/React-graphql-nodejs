@@ -1,10 +1,4 @@
-import { stringifyVariables } from '@urql/core';
-import {
-	DataField,
-	NullArray,
-	Resolver,
-	Variables,
-} from '@urql/exchange-graphcache';
+import { Resolver } from '@urql/exchange-graphcache';
 
 export type MergeMode = 'before' | 'after';
 
@@ -28,26 +22,37 @@ export const cursorPagination = (): Resolver => {
 		//   const fkey = `${fieldName}(${stringifyVariables(fieldArgs)})`;
 		//   const isIncache2 = cache.resolveFieldByKey(entityKey, fkey);
 
-		const isInTheCache = cache.resolve(
-			{ __typename: entityKey },
-			fieldName,
-			fieldArgs
+		const isInCache = cache.resolve(
+			cache.resolve({ __typename: entityKey }, fieldName, fieldArgs) as string,
+			fieldName
 		);
-    
+
+		info.partial = !isInCache;
+
 		const results: string[] = [];
 
+		let hasMore = true;
 		fieldInfos.forEach((fi) => {
 			// const data = cache.resolveFieldByKey(entityKey, fi.fieldKey) // Deprecated!!
-			const data = cache.resolve(
+			const key = cache.resolve(
 				{ __typename: entityKey },
 				fieldName,
 				fi.arguments
-			) as string[];
-			// console.log(data); e.g: ['Post:14', 'Post:2', ...]
+			) as string; // e.g : Query.posts({limit: 10})
+			const data = cache.resolve(key, fieldName) as string[];
+			const _hasMore = cache.resolve(key, 'hasMore') as boolean;
+			if (!_hasMore) {
+				hasMore = _hasMore;
+			}
+			//console.log(hasMore, posts); // e.g: ['Post:14', 'Post:2', ...]
 
 			results.push(...data);
 		});
-		return results;
+		return {
+      __typename: 'PaginatedPosts',
+			posts: results,
+			hasMore: hasMore,
+		};
 
 		// 	const visited = new Set();
 		// 	let result: NullArray<string> = [];

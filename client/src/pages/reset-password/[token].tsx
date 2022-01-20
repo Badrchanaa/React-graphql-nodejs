@@ -9,7 +9,6 @@ import Wrapper from '../../components/Wrapper';
 import { useChangePasswordMutation } from '../../generated/graphql';
 import { createUrqlClient } from '../../utils/createUrqlClient';
 import { toErrorMap } from '../../utils/toErrorMap';
-import { validPassword } from '../../utils/validPassword';
 
 const ResetPassword: NextPage = () => {
 	const router = useRouter();
@@ -20,7 +19,7 @@ const ResetPassword: NextPage = () => {
 		password: string;
 		confirmPassword: string;
 	}) => {
-		if (!validPassword(values.password)) {
+		if (values.password.length <= 7) {
 			return { password: 'Password must contain at least 8 characters' };
 		} else if (values.password !== values.confirmPassword) {
 			return { confirmPassword: 'Passwords does not match' };

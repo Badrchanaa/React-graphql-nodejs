@@ -11,6 +11,7 @@ const NavBar: React.FC<NavBarProps> = ({}) => {
 	const [{ data, fetching }] = useMeQuery({
     pause: isServer()
   });
+  
 	let body = null;
 	if (fetching) body = <div>Loading...</div>;
 	else if (!data?.me) {

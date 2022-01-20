@@ -5,6 +5,7 @@ import { usePostsQuery } from '../generated/graphql';
 import { createUrqlClient } from '../utils/createUrqlClient';
 import NextLink from 'next/link';
 import { useState } from 'react';
+import { Post } from '../components/Post';
 
 const Index = () => {
 	const [variables, setVariables] = useState({
@@ -30,13 +31,10 @@ const Index = () => {
 				<div>Loading...</div>
 			) : (
 				<Stack spacing={8}>
-					{data!.posts.map((post) => (
-						<Box p={5} shadow="md" borderWidth="1px" flex="1" borderRadius="md">
-							<Heading fontSize="xl">{post.title}</Heading>
-							<Text mt={4}>{post.textSnippet}</Text>
-						</Box>
+					{data!.posts.posts.map((post) => (
+						<Post key={post.id} post={post} />
 					))}
-					{data && (
+					{data && data.posts.hasMore && (
 						<Flex>
 							<Button
 								mx="auto"
@@ -44,7 +42,8 @@ const Index = () => {
 								onClick={() => {
 									setVariables((prevState) => ({
 										...prevState,
-										cursor: data.posts[data.posts.length - 1].createdAt,
+										cursor:
+											data.posts.posts[data.posts.posts.length - 1].createdAt,
 									}));
 								}}>
 								Load more...

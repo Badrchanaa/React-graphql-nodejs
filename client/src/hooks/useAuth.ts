@@ -3,9 +3,7 @@ import { useEffect } from 'react';
 import { useMeQuery } from '../generated/graphql';
 
 export const useAuth = (router: NextRouter) => {
-
-  const [{ data, fetching }] = useMeQuery();
-
+	const [{ data, fetching }] = useMeQuery();
 	useEffect(() => {
 		if (fetching) return;
 		if (!data?.me) {

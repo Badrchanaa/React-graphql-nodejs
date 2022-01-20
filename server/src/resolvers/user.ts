@@ -7,10 +7,12 @@ import {
 	Arg,
 	Ctx,
 	Field,
+	FieldResolver,
 	Mutation,
 	ObjectType,
 	Query,
 	Resolver,
+	Root,
 } from 'type-graphql';
 import { ApolloServerContext } from 'src/types';
 import argon2 from 'argon2';
@@ -20,6 +22,7 @@ import { sendEmail } from '../utils/sendEmail';
 import { v4 as uuidv4 } from 'uuid';
 import { invalidPasswordError, tokenExpiredError } from '../utils/errors';
 import { getConnection } from 'typeorm';
+
 @ObjectType()
 class FieldError {
 	@Field()
@@ -38,8 +41,15 @@ class UserResponse {
 	user?: User;
 }
 
-@Resolver()
+@Resolver(User)
 class UserResolver {
+  
+	@FieldResolver()
+	email(@Root() user: User, @Ctx() { req }: ApolloServerContext) {
+		if (req.session.userId === user.id) return user.email;
+		return '';
+	}
+
 	@Query(() => User, { nullable: true })
 	me(@Ctx() { req }: ApolloServerContext) {
 		const userId = req.session.userId;
@@ -125,12 +135,11 @@ class UserResolver {
 				.insert()
 				.into(User)
 				.values({ username, password: hashedPassword, email })
-        .returning('*')
+				.returning('*')
 				.execute();
 			//console.log('Result: ', result);
 			user = result.raw[0];
 		} catch (err) {
-			//console.log('Err: ', err);
 			// Error duplicate field
 			if (err.code === '23505')
 				return {
@@ -160,7 +169,7 @@ class UserResolver {
 				errors: [
 					{
 						field: 'username',
-						message: "That username doesn't exist",
+						message: "username doesn't exist",
 					},
 				],
 			};

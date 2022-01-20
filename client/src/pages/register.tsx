@@ -8,6 +8,7 @@ import { toErrorMap } from '../utils/toErrorMap';
 import { useRouter } from 'next/router';
 import { withUrqlClient } from 'next-urql';
 import { createUrqlClient } from '../utils/createUrqlClient';
+import { validateRegister } from '../utils/validateRegister';
 
 interface registerProps {}
 
@@ -17,6 +18,8 @@ const Register: React.FC<registerProps> = ({}) => {
 	return (
 		<Wrapper variant="small">
 			<Formik
+        validateOnChange={false}
+        validate={validateRegister}
 				initialValues={{ username: '', email: '', password: '' }}
 				onSubmit={async (values, { setErrors }) => {
 					const response = await register({ options: values });

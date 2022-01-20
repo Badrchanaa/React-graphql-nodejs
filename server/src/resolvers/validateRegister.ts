@@ -12,11 +12,11 @@ export const validateRegister = ({
 				message: 'invalid email.',
 			},
 		];
-	if (!username || username.length <= 2 || !/^[a-zA-Z0-9]+$/.test(username))
+	if (!username || !/^[\w](?!.*?\.{2})[\w.]{1,28}[\w]$/.test(username))
 		return [
 			{
 				field: 'username',
-				message: 'length must be greater than 2.',
+				message: 'invalid username.',
 			},
 		];
 
@@ -24,7 +24,14 @@ export const validateRegister = ({
 		return [
 			{
 				field: 'password',
-				message: 'length must be greater than 7.',
+				message: 'too short!',
+			},
+		];
+	else if (password.length > 40)
+		return [
+			{
+				field: 'password',
+				message: 'too long!',
 			},
 		];
 	return null;
